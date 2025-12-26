@@ -5,7 +5,7 @@ from core import Cog, gumballz, Context
 import games as games
 from utils.Tools import *
 from games import button_games as btn
-from games.baucua import BauCuaGame
+from games import BauCuaGame, VuaTiengVietGame
 from utils.coins_db import CoinsDB
 import random
 import asyncio
@@ -189,10 +189,10 @@ class Games(Cog):
         game = btn.LightsOut()
         await game.start(ctx)
 
-    @commands.command(name="baucua",
+    @commands.command(name="bau-cua",
                              help="Play Bau Cua Tom Ca game.",
-                             aliases=["bau-cua"],
-                             usage="baucua")
+                             aliases=["baucua", "bc"],
+                             usage="bau-cua")
     @blacklist_check()
     @ignore_check()
     @commands.cooldown(1, 3, commands.BucketType.user)
@@ -204,5 +204,23 @@ class Games(Cog):
             await game.start(ctx)
         except Exception as e:
             await ctx.send(f"⚠️ Error starting Bau Cua: {e}")
+            import traceback
+            traceback.print_exc()
+
+    @commands.command(name="vua-tieng-viet",
+                             help="Play Vua Tiếng Việt game.",
+                             aliases=["vtv"],
+                             usage="vua-tieng-viet")
+    @blacklist_check()
+    @ignore_check()
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.max_concurrency(1, per=commands.BucketType.channel, wait=False)
+    @commands.guild_only()
+    async def _vtv(self, ctx: Context):
+        try:
+            game = VuaTiengVietGame(self.client, self.coins_db)
+            await game.start(ctx)
+        except Exception as e:
+            await ctx.send(f"⚠️ Error starting Vua Tiếng Việt: {e}")
             import traceback
             traceback.print_exc()
