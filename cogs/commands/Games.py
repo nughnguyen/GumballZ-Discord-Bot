@@ -280,3 +280,48 @@ class Games(Cog):
             return
 
         await self.word_chain_game.start(ctx, "en")
+
+    @commands.group(name="fishing",
+                             help="Games Commands\nGames\nblackjack , bau-cua, chess , tic-tac-toe , country-guesser , rps , lights-out , wordle , 2048 , memory-game , number-slider , battleship , connect-four , slots, counting, vua-tieng-viet, noi-tu, wordchain, fishing",
+                             aliases=["fish"],
+                             usage="fishing [option]")
+    @blacklist_check()
+    @ignore_check()
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.max_concurrency(1, per=commands.BucketType.channel, wait=False)
+    @commands.guild_only()
+    async def _fishing(self, ctx: Context):
+         if ctx.invoked_subcommand is None:
+             # Default action: FISH
+             game = games.FishingGame(self.client, self.coins_db)
+             await game.fish(ctx)
+
+    @_fishing.command(name="biomes", aliases=["khu-vuc", "map"])
+    async def _fishing_biomes(self, ctx: Context):
+         game = games.FishingGame(self.client, self.coins_db)
+         await game.biomes_cmd(ctx)
+
+    @_fishing.command(name="shop", aliases=["st"])
+    async def _fishing_shop(self, ctx: Context):
+         game = games.FishingGame(self.client, self.coins_db)
+         await game.shop(ctx)
+
+    @_fishing.command(name="bag", aliases=["inventory", "tui"])
+    async def _fishing_inv(self, ctx: Context):
+         game = games.FishingGame(self.client, self.coins_db)
+         await game.inventory(ctx)
+
+    @_fishing.command(name="sell", aliases=["ban"])
+    async def _fishing_sell(self, ctx: Context):
+         game = games.FishingGame(self.client, self.coins_db)
+         await game.sell(ctx)
+         
+    @_fishing.command(name="stats", aliases=["profile"])
+    async def _fishing_stats(self, ctx: Context):
+         game = games.FishingGame(self.client, self.coins_db)
+         await game.fish_stats_cmd(ctx)
+
+    @_fishing.command(name="goi-rong", aliases=["summon"])
+    async def _fishing_summon(self, ctx: Context):
+         game = games.FishingGame(self.client, self.coins_db)
+         await game.summon_shenron(ctx)

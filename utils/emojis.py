@@ -93,7 +93,7 @@ def get_rank_emoji(rank: int) -> str:
 def get_random_correct_emoji() -> str:
     """Trả về emoji ngẫu nhiên cho câu trả lời đúng"""
     import random
-    return random.choice([CORRECT, FIRE, HUNDRED, SPARKLES, LIGHTNING, ANIMATED_EMOJI_CORRECT, FIRE, HUNDRED])
+    return random.choice([CORRECT, FIRE, HUNDRED, SPARKLES, LIGHTNING, ANIMATED_EMOJI_CORRECT, ANIMATED_EMOJI_FIRE, ANIMATED_EMOJI_HUNDRED])
 
 def get_random_wrong_emoji() -> str:
     """Trả về emoji ngẫu nhiên cho câu trả lời sai"""

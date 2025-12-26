@@ -15,6 +15,4 @@ class _games(commands.Cog):
 
     @commands.group(name="Games")
     async def _Games(self, ctx: commands.Context):
-        """blackjack , bau-cua, chess , tic-tac-toe , country-guesser , rps , lights-out , wordle , 2048 , memory-game , number-slider , battleship , connect-four , slots, counting, vua-tieng-viet, noi-tu, wordchain
-•
-sử dụng custom emoji"""
+        """blackjack , bau-cua, chess , tic-tac-toe , country-guesser , rps , lights-out , wordle , 2048 , memory-game , number-slider , battleship , connect-four , slots, counting, vua-tieng-viet, noi-tu, wordchain, fishing"""
