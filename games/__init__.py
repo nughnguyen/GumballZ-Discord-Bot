@@ -25,6 +25,7 @@ from .country_guess import CountryGuesser
 from .wordle import Wordle
 from .baucua import BauCuaGame
 from .vua_tieng_viet import VuaTiengVietGame
+from .word_chain import WordChainGame
 
 __all__: tuple[str, ...] = (
     "BattleShip",
@@ -40,6 +41,7 @@ __all__: tuple[str, ...] = (
     "Wordle",
     "BauCuaGame",
     "VuaTiengVietGame",
+    "WordChainGame",
 )
 
 __title__ = "discord_games"

@@ -5,7 +5,7 @@ from core import Cog, gumballz, Context
 import games as games
 from utils.Tools import *
 from games import button_games as btn
-from games import BauCuaGame, VuaTiengVietGame
+from games import BauCuaGame, VuaTiengVietGame, WordChainGame
 from utils.coins_db import CoinsDB
 import random
 import asyncio
@@ -19,6 +19,7 @@ class Games(Cog):
         self.client = client
         self.coins_db = CoinsDB()
         asyncio.create_task(self.coins_db.initialize())
+        self.word_chain_game = WordChainGame(client, self.coins_db)
 
 
     @commands.hybrid_command(name="chess",
@@ -224,3 +225,58 @@ class Games(Cog):
             await ctx.send(f"⚠️ Error starting Vua Tiếng Việt: {e}")
             import traceback
             traceback.print_exc()
+
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        if hasattr(self, 'word_chain_game') and self.word_chain_game:
+            await self.word_chain_game.on_message(message)
+
+    @commands.command(name="noi-tu",
+                             help="Play Vietnamese Word Chain game.",
+                             aliases=["nt"],
+                             usage="noi-tu [stop]")
+    @blacklist_check()
+    @ignore_check()
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.max_concurrency(1, per=commands.BucketType.channel, wait=False)
+    @commands.guild_only()
+    async def _noitu(self, ctx: Context, option: str = None):
+        if option and option.lower() in ["stop", "end"]:
+            if ctx.channel.id in self.word_chain_game.active_games:
+                # Check permissions: Host or Admin
+                game = self.word_chain_game.active_games[ctx.channel.id]
+                if ctx.author.id == game['first_player_id'] or ctx.author.guild_permissions.manage_messages:
+                    await self.word_chain_game.stop_game(ctx.channel)
+                    await ctx.send("🛑 Đã dừng game!", delete_after=5)
+                else:
+                    await ctx.send("⚠️ Chỉ người tạo phòng hoặc Admin mới được dừng game!", delete_after=5)
+            else:
+                await ctx.send("⚠️ Không có game nào đang chạy ở kênh này!", delete_after=5)
+            return
+
+        await self.word_chain_game.start(ctx, "vi")
+
+    @commands.command(name="wordchain",
+                             help="Play English Word Chain game.",
+                             aliases=["wc"],
+                             usage="wordchain [stop]")
+    @blacklist_check()
+    @ignore_check()
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.max_concurrency(1, per=commands.BucketType.channel, wait=False)
+    @commands.guild_only()
+    async def _wordchain(self, ctx: Context, option: str = None):
+        if option and option.lower() in ["stop", "end"]:
+            if ctx.channel.id in self.word_chain_game.active_games:
+                # Check permissions
+                game = self.word_chain_game.active_games[ctx.channel.id]
+                if ctx.author.id == game['first_player_id'] or ctx.author.guild_permissions.manage_messages:
+                    await self.word_chain_game.stop_game(ctx.channel)
+                    await ctx.send("🛑 Game stopped!", delete_after=5)
+                else:
+                    await ctx.send("⚠️ Only the host or Admin can stop the game!", delete_after=5)
+            else:
+                await ctx.send("⚠️ No game running in this channel!", delete_after=5)
+            return
+
+        await self.word_chain_game.start(ctx, "en")

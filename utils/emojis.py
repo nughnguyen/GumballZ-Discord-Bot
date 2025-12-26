@@ -93,9 +93,7 @@ def get_rank_emoji(rank: int) -> str:
 def get_random_correct_emoji() -> str:
     """Trả về emoji ngẫu nhiên cho câu trả lời đúng"""
     import random
-    # Note: ANIMATED_EMOJI_FIRE and ANIMATED_EMOJI_HUNDRED were used in MarbleSoda but not defined in emojis.py. 
-    # Providing placeholders or using available ones.
-    return random.choice([CORRECT, FIRE, HUNDRED, SPARKLES, LIGHTNING, ANIMATED_EMOJI_CORRECT])
+    return random.choice([CORRECT, FIRE, HUNDRED, SPARKLES, LIGHTNING, ANIMATED_EMOJI_CORRECT, FIRE, HUNDRED])
 
 def get_random_wrong_emoji() -> str:
     """Trả về emoji ngẫu nhiên cho câu trả lời sai"""

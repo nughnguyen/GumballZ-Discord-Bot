@@ -15,6 +15,6 @@ class _games(commands.Cog):
 
     @commands.group(name="Games")
     async def _Games(self, ctx: commands.Context):
-        """blackjack , bau-cua(thay đổi từ baucua), chess , tic-tac-toe , country-guesser , rps , lights-out , wordle , 2048 , memory-game , number-slider , battleship , connect-four , slots, counting, vua-tieng-viet (game mới cần thêm)
+        """blackjack , bau-cua, chess , tic-tac-toe , country-guesser , rps , lights-out , wordle , 2048 , memory-game , number-slider , battleship , connect-four , slots, counting, vua-tieng-viet, noi-tu, wordchain
 •
 sử dụng custom emoji"""
