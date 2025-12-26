@@ -5,6 +5,8 @@ from core import Cog, gumballz, Context
 import games as games
 from utils.Tools import *
 from games import button_games as btn
+from games.baucua import BauCuaGame
+from utils.coins_db import CoinsDB
 import random
 import asyncio
 
@@ -15,6 +17,8 @@ class Games(Cog):
 
     def __init__(self, client: gumballz):
         self.client = client
+        self.coins_db = CoinsDB()
+        asyncio.create_task(self.coins_db.initialize())
 
 
     @commands.hybrid_command(name="chess",
@@ -184,3 +188,21 @@ class Games(Cog):
     async def _lights_show(self, ctx: Context):
         game = btn.LightsOut()
         await game.start(ctx)
+
+    @commands.command(name="baucua",
+                             help="Play Bau Cua Tom Ca game.",
+                             aliases=["bau-cua"],
+                             usage="baucua")
+    @blacklist_check()
+    @ignore_check()
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.max_concurrency(1, per=commands.BucketType.channel, wait=False)
+    @commands.guild_only()
+    async def _baucua(self, ctx: Context):
+        try:
+            game = BauCuaGame(self.client, self.coins_db)
+            await game.start(ctx)
+        except Exception as e:
+            await ctx.send(f"⚠️ Error starting Bau Cua: {e}")
+            import traceback
+            traceback.print_exc()

@@ -23,6 +23,7 @@ from .rps import RockPaperScissors
 from .reaction_test import ReactionGame
 from .country_guess import CountryGuesser
 from .wordle import Wordle
+from .baucua import BauCuaGame
 
 __all__: tuple[str, ...] = (
     "BattleShip",
@@ -36,6 +37,7 @@ __all__: tuple[str, ...] = (
     "ReactionGame",
     "CountryGuesser",
     "Wordle",
+    "BauCuaGame",
 )
 
 __title__ = "discord_games"

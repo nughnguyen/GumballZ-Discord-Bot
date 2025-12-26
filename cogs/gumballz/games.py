@@ -13,6 +13,6 @@ class _games(commands.Cog):
 		      description = "Show you Commands of Games"
 		      return emoji, label, description
 
-    @commands.group()
-    async def __Games__(self, ctx: commands.Context):
-        """`blackjack` , `chess` , `tic-tac-toe` , `country-guesser` , `rps` , `lights-out` , `wordle` , `2048` , `memory-game` , `number-slider` , `battleship` , `connect-four` , `slots`, `counting`"""
+    @commands.group(name="Games")
+    async def _Games(self, ctx: commands.Context):
+        """blackjack , baucua, chess , tic-tac-toe , country-guesser , rps , lights-out , wordle , 2048 , memory-game , number-slider , battleship , connect-four , slots, counting"""
