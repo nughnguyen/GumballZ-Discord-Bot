@@ -73,10 +73,10 @@ class gumballz(commands.AutoShardedBot):
 
         self.status_list = [
             (discord.ActivityType.playing, f"{prefix}help | Security in your Server"),
+            (discord.ActivityType.listening, "Powered by GumballZ"),
             (discord.ActivityType.watching, f"{user_count} users"),
             (discord.ActivityType.watching, f"{guild_count} servers"),
-            (discord.ActivityType.listening, "Killing Nukers"),
-            (discord.ActivityType.playing, "Protector Gumballz"),
+            (discord.ActivityType.playing, "Developer: Nguyen Quoc Hung"),
         ]
 
         current = self.status_list[self.status_index % len(self.status_list)]
