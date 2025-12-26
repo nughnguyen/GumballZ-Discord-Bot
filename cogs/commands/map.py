@@ -51,7 +51,7 @@ class MapView(ui.View):
         embed.add_field(name="📏  Map Size", value=f"➜  {self.map_size}")
         embed.add_field(name="📍 Current Coordinates", value=f"➜  {self.latitude}, {self.longitude}")
         embed.set_image(url=self.map_url)
-        embed.set_footer(text="Made by Zyrox X Development™")
+        embed.set_footer(text="Made by GumballZ™")
         try:
             await interaction.message.edit(embed=embed, view=self)
         except Exception as e:

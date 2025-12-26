@@ -11,7 +11,7 @@ import asyncio
 
 
 class Games(Cog):
-    """Zyrox Games"""
+    """GumballZ Games"""
 
     def __init__(self, client: gumballz):
         self.client = client

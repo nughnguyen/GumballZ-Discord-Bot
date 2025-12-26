@@ -273,7 +273,7 @@ class General(commands.Cog):
     else:
       await ctx.send(user.mention + "'s token: " + "".join(token))
 
-  @commands.command(name="users", help="checks total users of Zyrox X.")
+  @commands.command(name="users", help="checks total users of GumballZ.")
   @blacklist_check()
   @ignore_check()
   @commands.cooldown(1, 3, commands.BucketType.user)

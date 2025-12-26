@@ -43,7 +43,7 @@ class Counting(commands.Cog):
         )
         embed.add_field(name="Current Status", value=f"{CROSS} Disabled", inline=False)
         embed.add_field(name="How to Enable", value="Use `counting enable` to enable counting.", inline=False)
-        embed.set_footer(text="Powered By Zyrox X Development™")
+        embed.set_footer(text="Powered By GumballZ™")
         await ctx.send(embed=embed)
 
     async def send_help_embed(self, ctx):

@@ -195,7 +195,7 @@ class Owner(commands.Cog):
                 member = await self.client.fetch_user(staff_id)
                 member_list.append(f"{member.name}#{member.discriminator} (ID: {staff_id})")
             staff_display = "\n".join(member_list)
-            sonu = discord.Embed(title="<:tick:1453391589148983367> Zyrox Staffs", description=f"\n{staff_display}", color=0xFF0000)
+            sonu = discord.Embed(title="<:tick:1453391589148983367> GumballZ Staffs", description=f"\n{staff_display}", color=0xFF0000)
             await ctx.send(embed=sonu)
 
     @commands.command(name="slist")
@@ -309,7 +309,7 @@ class Owner(commands.Cog):
         ]
         paginator = Paginator(source=DescriptionEmbedPaginator(
             entries=entries,
-            title=f"Zyrox Owners [{len(nplist)}]",
+            title=f"GumballZ Owners [{len(nplist)}]",
             description="",
             per_page=10,
             color=0xFF0000),
