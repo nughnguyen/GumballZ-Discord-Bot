@@ -75,6 +75,7 @@ class Twenty48:
 
         self.board: Board = [[0 for _ in range(4)] for _ in range(4)]
         self.message: Optional[discord.Message] = None
+        self.won: bool = False
 
         self._controls = ["⬅️", "➡️", "⬆️", "⬇️"]
         self._conversion = number_to_display_mapping
@@ -218,6 +219,7 @@ class Twenty48:
 
                 if num == self.win_at:
                     self.embed.description += "**Game Over! You Won**\n"
+                    self.won = True
                     return True
         return False
 

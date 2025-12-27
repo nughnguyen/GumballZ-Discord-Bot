@@ -43,6 +43,7 @@ class Wordle:
         )
 
         self.guesses: list[list[dict[str, str]]] = []
+        self.won: bool = False
 
         if word:
             if len(word) != 5:
@@ -171,6 +172,7 @@ class Wordle:
                 )
 
                 if won:
+                    self.won = True
                     await ctx.send("Game Over! You won!")
                     break
                 elif len(self.guesses) >= 6:

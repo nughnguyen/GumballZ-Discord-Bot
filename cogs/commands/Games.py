@@ -9,6 +9,7 @@ from games import BauCuaGame, VuaTiengVietGame, WordChainGame
 from utils.coins_db import CoinsDB
 import random
 import asyncio
+import utils.game_utils as gu
 
 
 
@@ -21,6 +22,13 @@ class Games(Cog):
         asyncio.create_task(self.coins_db.initialize())
         self.word_chain_game = WordChainGame(client, self.coins_db)
 
+    def help_custom(self):
+        emoji = '<:games:1453391627329470726>'
+        label = "Games"
+        description = "Play games with friends or bot."
+        return emoji, label, description
+
+
 
     @commands.hybrid_command(name="chess",
                              help="Play Chess with a user.",
@@ -30,48 +38,130 @@ class Games(Cog):
     @commands.cooldown(1, 3, commands.BucketType.user)
     @commands.max_concurrency(5, per=commands.BucketType.default, wait=False)
     @commands.guild_only()
-    async def _chess(self, ctx: Context, player: discord.Member):
+    async def _chess(self, ctx: Context, player: discord.Member, bet: int = 0):
         if player == ctx.author:
             await ctx.send("You Cannot play game with yourself!",
                            mention_author=False)
         elif player.bot:
             await ctx.send("You cannot play with bots!")
         else:
+            if not await gu.handle_pvp_bet_start(ctx, self.coins_db, player, bet):
+                 return
+                 
             game = btn.BetaChess(white=ctx.author, black=player)
             await game.start(ctx)
+            
+            winner = game.winner
+            if winner:
+                 loser = player if winner == ctx.author else ctx.author
+                 await gu.process_bet_result(ctx, self.coins_db, winner, loser, bet, guild_id=0)
+            else:
+                 await gu.process_bet_result(ctx, self.coins_db, None, None, bet, tie=True, guild_id=0)
 
 
     @commands.hybrid_command(name="rps",
                              help="Play Rock Paper Scissor with bot/user.",
                              aliases=["rockpaperscissors"],
-                             usage="Rockpaperscissors")
+                             usage="Rockpaperscissors [member] [bet]")
     @blacklist_check()
     @ignore_check()
     @commands.cooldown(1, 3, commands.BucketType.user)
     @commands.max_concurrency(5, per=commands.BucketType.default, wait=False)
     @commands.guild_only()
-    async def _rps(self, ctx: Context, player: discord.Member = None):
-        game = btn.BetaRockPaperScissors(player)
-        await game.start(ctx, timeout=120)
+    async def _rps(self, ctx: Context, player: discord.Member = None, bet: int = 0):
+        if player and player.bot:
+             # Assuming 'player' argument might capture the bot if mentioned, or passed as None implies Bot.
+             # But usually users ping a bot to play against it? 
+             # The code previously just initialized with 'player'. 
+             # If player is None -> Bot. If player is Bot -> Bot?
+             pass 
+
+        if player and not player.bot:
+             # PvP
+             if not await gu.handle_pvp_bet_start(ctx, self.coins_db, player, bet):
+                 return
+             game = btn.BetaRockPaperScissors(player)
+             await game.start(ctx, timeout=120)
+             
+             winner = game.winner
+             if winner:
+                 loser = player if winner == ctx.author else ctx.author
+                 await gu.process_bet_result(ctx, self.coins_db, winner, loser, bet, guild_id=0)
+             elif hasattr(game, 'winner') and game.winner is None: # Tie
+                 await gu.process_bet_result(ctx, self.coins_db, None, None, bet, tie=True, guild_id=0)
+                 
+        else:
+             # PvBot (player is None)
+             if bet > 0:
+                 if not await gu.check_balance(self.coins_db, ctx.author.id, bet):
+                     await ctx.send(f"You don't have enough Coiz to bet {bet}!")
+                     return
+             
+             game = btn.BetaRockPaperScissors(player) # player is None or Bot
+             await game.start(ctx, timeout=120)
+             
+             # Logic regarding Bot game rewards
+             # If bet > 0:
+             #   Win: Author gets +bet (doubles money basically? Or just gets bet amount?)
+             #        Usually betting 100 means you put 100, if win you get 100 back + 100 profit. 
+             #        Our 'add_points' just adds X. 
+             #        If I bet 100 against Bot:
+             #           Start: Check > 100.
+             #           Win: +100. (Net +100).
+             #           Lose: -100. (Net -100).
+             
+             winner = game.winner
+             if winner == ctx.author:
+                 if bet > 0:
+                      await ctx.send(f"You beat the bot and won **{bet} Coiz**!")
+                      await self.coins_db.add_points(ctx.author.id, 0, bet)
+                 else:
+                      # Default reward? "Those not needing bet will get Coiz"
+                      reward = 100
+                      await ctx.send(f"You beat the bot! Reward: {reward} Coiz.")
+                      await self.coins_db.add_points(ctx.author.id, 0, reward)
+             elif winner is None and str(game.embed.description).startswith("**Tie"):
+                 pass # Tie
+             else: 
+                 # User Lost (winner is None but not Tie, or specific indicator)
+                 # In my RPS modification: Tie -> winner=None. User Win -> winner=User. User Lost (Bot Win) -> winner=None.
+                 # I need to distinguish Tie vs Loss.
+                 # I can check game.embed.description.
+                 desc = str(game.embed.description)
+                 if "Tie!" not in desc and "You Won!" not in desc:
+                      # Loss
+                      if bet > 0:
+                           await ctx.send(f"You lost **{bet} Coiz** to the bot!")
+                           await self.coins_db.add_points(ctx.author.id, 0, -bet)
 
     @commands.hybrid_command(name="tic-tac-toe",
                              help="play tic-tac-toe game with a user.",
                              aliases=["ttt", "tictactoe"],
-                             usage="Ticktactoe <member>")
+                             usage="Ticktactoe <member> [bet]")
     @blacklist_check()
     @ignore_check()
     @commands.cooldown(1, 3, commands.BucketType.user)
     @commands.max_concurrency(5, per=commands.BucketType.user, wait=False)
     @commands.guild_only()
-    async def _ttt(self, ctx: Context, player: discord.Member):
+    async def _ttt(self, ctx: Context, player: discord.Member, bet: int = 0):
         if player == ctx.author:
             await ctx.send("You Cannot play game with yourself!",
                            mention_author=False)
         elif player.bot:
             await ctx.send("You cannot play with bots!")
         else:
+            if not await gu.handle_pvp_bet_start(ctx, self.coins_db, player, bet):
+                 return
+                 
             game = btn.BetaTictactoe(cross=ctx.author, circle=player)
             await game.start(ctx, timeout=30)
+            
+            winner = game.winner
+            if winner:
+                 loser = player if winner == ctx.author else ctx.author
+                 await gu.process_bet_result(ctx, self.coins_db, winner, loser, bet, guild_id=0)
+            else:
+                 await gu.process_bet_result(ctx, self.coins_db, None, None, bet, tie=True, guild_id=0)
 
     @commands.hybrid_command(name="wordle",
                              help="Wordle Game | Play with bot.",
@@ -84,6 +174,12 @@ class Games(Cog):
     async def _wordle(self, ctx: Context):
         game = games.Wordle()
         await game.start(ctx, timeout=120)
+        
+        if getattr(game, 'won', False):
+             reward = 200
+             emoji = "<a:cattoken:1449205470861459546>"
+             await ctx.send(f"🎉 You won Wordle! Here is **{reward} Coiz** {emoji}!")
+             await self.coins_db.add_points(ctx.author.id, 0, reward)
 
     @commands.hybrid_command(name="2048",
                              help="Play 2048 game with bot.",
@@ -97,6 +193,12 @@ class Games(Cog):
     async def _2048(self, ctx: Context):
         game = btn.BetaTwenty48()
         await game.start(ctx, win_at=2048)
+        
+        if getattr(game, 'won', False):
+             reward = 200
+             emoji = "<a:cattoken:1449205470861459546>"
+             await ctx.send(f"🎉 You reached 2048! Here is **{reward} Coiz** {emoji}!")
+             await self.coins_db.add_points(ctx.author.id, 0, reward)
 
     @commands.hybrid_command(name="memory-game",
                              help="How strong is your memory?",
@@ -127,15 +229,27 @@ class Games(Cog):
     @commands.hybrid_command(name="battleship",
                              help="Play battleship game with your friend.",
                              aliases=["battle-ship"],
-                             usage="battleship <user>")
+                             usage="battleship <user> [bet]")
     @blacklist_check()
     @ignore_check()
     @commands.cooldown(1, 3, commands.BucketType.user)
     @commands.max_concurrency(3, per=commands.BucketType.default, wait=False)
     @commands.guild_only()
-    async def _battle(self, ctx: Context, player: discord.Member):
+    async def _battle(self, ctx: Context, player: discord.Member, bet: int = 0):
+        if player.bot:
+             await ctx.send("You cannot play with bots!")
+             return
+
+        if not await gu.handle_pvp_bet_start(ctx, self.coins_db, player, bet):
+             return
+             
         game = btn.BetaBattleShip(player1=ctx.author, player2=player)
         await game.start(ctx)
+        
+        winner = game.winner
+        if winner:
+             loser = player if winner == ctx.author else ctx.author
+             await gu.process_bet_result(ctx, self.coins_db, winner, loser, bet, guild_id=0)
 
     @commands.group(name="country-guesser",
                     help="Guess name of the country by flag.",
@@ -160,20 +274,30 @@ class Games(Cog):
     @commands.hybrid_command(name="connectfour",
                              help="Play Connect Four game with user.",
                              aliases=["c4", "connect-four", "connect4"],
-                             usage="connectfour <user>")
+                             usage="connectfour <user> [bet]")
     @blacklist_check()
     @ignore_check()
     @commands.cooldown(1, 3, commands.BucketType.user)
     @commands.max_concurrency(1, per=commands.BucketType.user, wait=False)
     @commands.guild_only()
-    async def _connectfour(self, ctx: Context, player: discord.Member):
+    async def _connectfour(self, ctx: Context, player: discord.Member, bet: int = 0):
         if player == ctx.author:
             await ctx.send("You cannot play against yourself!")
         elif player.bot:
             await ctx.send("You cannot play with bots!")
         else:
+            if not await gu.handle_pvp_bet_start(ctx, self.coins_db, player, bet):
+                 return
+                 
             game = games.ConnectFour(red=ctx.author, blue=player)  
             await game.start(ctx, timeout=300)
+            
+            winner = game.winner
+            if winner:
+                 loser = player if winner == ctx.author else ctx.author
+                 await gu.process_bet_result(ctx, self.coins_db, winner, loser, bet, guild_id=0)
+            else:
+                 await gu.process_bet_result(ctx, self.coins_db, None, None, bet, tie=True, guild_id=0)
 
 
 

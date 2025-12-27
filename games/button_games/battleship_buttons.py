@@ -344,7 +344,10 @@ class BetaBattleShip(BattleShip):
         self.player1: Player = Player(player1, game=self)
         self.player2: Player = Player(player2, game=self)
 
+        self.player2: Player = Player(player2, game=self)
+
         self.turn: Player = self.player1
+        self.winner: Optional[discord.User] = None
 
     def get_board(self, player: discord.User, other: bool = False) -> Board:
         player = getattr(player, "player", player)
@@ -418,6 +421,7 @@ class BetaBattleShip(BattleShip):
         )
 
         if winner := self.who_won():
+            self.winner = winner
             await winner.send("Congrats, you won! :)")
 
             other = self.player2 if winner == self.player1 else self.player1

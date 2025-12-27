@@ -40,11 +40,14 @@ class RPSButton(discord.ui.Button["RPSView"]):
 
                 if user_choice == bot_choice:
                     game.embed.description = f"**Tie!**\nWe both picked {user_choice}"
+                    game.winner = None
                 else:
                     if game.check_win(bot_choice, user_choice):
                         game.embed.description = f"**You Won!**\nYou picked {user_choice} and I picked {bot_choice}."
+                        game.winner = interaction.user
                     else:
                         game.embed.description = f"**You Lost!**\nI picked {bot_choice} and you picked {user_choice}."
+                        game.winner = None # Bot won
 
                 self.view.disable_all()
                 self.view.stop()
@@ -71,12 +74,14 @@ class RPSButton(discord.ui.Button["RPSView"]):
                 if game.player1_choice and game.player2_choice:
                     if game.player1_choice == game.player2_choice:
                         game.embed.description = f"**Tie!**\nBoth {game.player1.mention} and {game.player2.mention} picked {game.player1_choice}."
+                        game.winner = None
                     else:
                         who_won = (
                             game.player1
                             if game.check_win(game.player2_choice, game.player1_choice)
                             else game.player2
                         )
+                        game.winner = who_won
 
                         game.embed.description = (
                             f"**{who_won.mention} Won!**"
@@ -126,6 +131,8 @@ class BetaRockPaperScissors(RockPaperScissors):
         if self.player2:
             self.player1_choice: Optional[str] = None
             self.player2_choice: Optional[str] = None
+        
+        self.winner: Optional[discord.User] = None
 
     async def start(
         self,
