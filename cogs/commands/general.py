@@ -24,9 +24,7 @@ from datetime import datetime, timezone, timedelta
 import sqlite3
 from typing import *
 import string
-from utils.coins_db import CoinsDB
 #from cogs.commands.moderation import do_removal
-
 
 lawda = [
   '8', '3821', '23', '21', '313', '43', '29', '76', '11', '9',
@@ -90,18 +88,10 @@ class General(commands.Cog):
 
   def __init__(self, bot, *args, **kwargs):
     self.bot = bot
-    self.coins_db = CoinsDB()
 
     self.aiohttp = aiohttp.ClientSession()
     self._URL_REGEX = r'(?P<url><[^: >]+:\/[^ >]+>|(?:https?|steam):\/\/[^\s<]+[^<.,:;\"\'\]\s])'
     self.color = 0xFF0000
-
-  def help_custom(self):
-    emoji = '<:wrench:1453391598426656818>'
-    label = "Utility"
-    description = "Utility commands."
-    return emoji, label, description
-
 
 
   @commands.hybrid_command(
@@ -462,5 +452,3 @@ class General(commands.Cog):
           icon_url=self.bot.user.avatar.url
       )
       await ctx.send(embed=embed)
-
-

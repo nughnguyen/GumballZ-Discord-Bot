@@ -1,6 +1,5 @@
 import discord
 import functools
-from discord.ext import commands
 from utils.Tools import *
 
 
@@ -149,47 +148,20 @@ class View(discord.ui.View):
                     label = f"{original_label} {counter}"
                     counter += 1
                 used_labels.add(label)
-                used_labels.add(label)
                 options.append(discord.SelectOption(label=label, emoji=emoji, description=description))
-                embed = discord.Embed(title=f"{emoji} {original_label}", description=f"{description}", color=0xFF0000)
-                embed.set_thumbnail(url=self.ctx.bot.user.avatar.url)
-
-                groups = []
-                standalone = []
+                embed = discord.Embed(title=f"{emoji} {original_label}", color=0xFF0000)
 
                 for command in cog.get_commands():
-                    if command.hidden:
-                        continue
-                    if isinstance(command, commands.Group):
-                        groups.append(command)
-                    else:
-                        standalone.append(command)
-
-                # Standalone Commands
-                if standalone:
-                     standalone.sort(key=lambda c: c.name)
-                     cmd_list = [f"`{c.name}`" for c in standalone]
-                     val = " , ".join(cmd_list)
-                     if len(val) > 1024:
-                         val = val[:1021] + "..."
-                     embed.add_field(name=f"{emoji} Commands", value=val, inline=False)
-
-                # Group Commands
-                groups.sort(key=lambda c: c.name)
-                for group in groups:
-                     cmds = [f"`{group.qualified_name}`"]
-                     subcommands = list(group.walk_commands())
-                     subcommands.sort(key=lambda c: c.qualified_name)
-                     
-                     for sub in subcommands:
-                         cmds.append(f"`{sub.qualified_name}`")
-                     
-                     val = " , ".join(cmds)
-                     if len(val) > 1024:
-                         val = val[:1021] + "..."
-                     
-                     embed.add_field(name=f"{group.name.title()}", value=val, inline=False)
-
+                    params = ""
+                    for param in command.clean_params:
+                        if param not in ["self", "ctx"]:
+                            params += f" <{param}>"
+                    help_text = command.help or "No description available"
+                    if len(help_text) > 1020:
+                        help_text = help_text[:1017] + "..."
+                    embed.add_field(name=f"{command.name}{params}",
+                                    value=f"{help_text}\n•",
+                                    inline=False)
                 embeds.append(embed)
                 total_pages += 1
 

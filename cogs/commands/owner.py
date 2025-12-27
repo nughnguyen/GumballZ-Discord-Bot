@@ -21,7 +21,6 @@ from utils.config import OWNER_IDS
 from discord.errors import Forbidden
 from discord import Embed
 from discord.ui import Button, View
-from utils.coins_db import CoinsDB
 
 # p1
 
@@ -138,15 +137,6 @@ class Owner(commands.Cog):
         self.bot_owner_ids = [561443914062757908]
         self.client.loop.create_task(self.setup_database())
         self.client.loop.create_task(self.load_staff())
-        self.coins_db = CoinsDB()
-        
-    def help_custom(self):
-        emoji = '<:codebase:1453391605565231105>'
-        label = "Developer"
-        description = "Bot Developer commands."
-        return emoji, label, description
-
-
         
 
     async def setup_database(self):
@@ -692,8 +682,6 @@ class Owner(commands.Cog):
         await do_removal(ctx, search, lambda e: e.author == member)
 
         
-
-
 # p2
 class Badges(commands.Cog):
     """Handles the profile and badge display system."""

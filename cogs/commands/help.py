@@ -113,6 +113,7 @@ class HelpCommand(commands.HelpCommand):
         name="<:Cloud:1453391936080711680>  __**Main Features**__",
         value=">>> \n <:Safe:1453391577962643476>  `»` Security\n" 
               " <:bot:1453391686611898431>  `»` Automoderation\n"
+              " <:codebase:1453391605565231105>  `»` Developer\n"
               " <:wrench:1453391598426656818>  `»` Utility\n" 
               " <:music:1453391554990313562>  `»` Music\n"
               " <:wifi:1453391596002349097>  `»` Autoreact & responder\n"
@@ -145,11 +146,9 @@ class HelpCommand(commands.HelpCommand):
               " <:mc:1453394900065456250>  `»` Minecraft <:New:1453394998807625820>\n"
               " <:msg:1453394902611394571>  `»` Joindm <:New:1453394998807625820>\n"
               " <:circle:1453395027211456575>  `»` Birthday <:New:1453394998807625820>\n"
-              " <:codebase:1453391605565231105>  `»` Developer <:New:1453394998807625820>\n"
               " <:circle:1453391690848276614>  `»` Customrole\n"
-              " <:coin:1449205470861459546>  `»` Economy <:New:1453394998807625820>\n"           
+              " <:coin:1449205470861459546>  `»` Economy <:New:1453394998807625820>\n" 
     )
-
 
     embed.set_footer(
       text=f"Requested By {self.context.author} | [Support](https://dsc.gg/thenoicez)",

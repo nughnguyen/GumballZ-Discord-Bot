@@ -69,9 +69,6 @@ from .commands.Birthday import Birthdays
 from .commands.nitro import Nitro
 from .commands.image import ImageCommands
 from .commands.youtube import Youtube
-from .commands.image import ImageCommands
-from .commands.youtube import Youtube
-from .commands.economy import Economy
 #____________ Events _____________
 
 #from .events.autoblacklist import AutoBlacklist
@@ -184,9 +181,8 @@ async def setup(bot: gumballz):
         AntiChannelCreate, AntiChannelDelete, AntiChannelUpdate, AntiEveryone, AntiGuildUpdate,
         AntiIntegration, AntiKick, AntiPrune, AntiRoleCreate, AntiRoleDelete,
         AntiRoleUpdate, AntiWebhookUpdate, AntiWebhookCreate, 
-        AntiWebhookDelete, AntiSpam, AntiCaps, AntiLink, AntiInvite, AntiMassMention, Stats, Status, NoPrefix, FilterCog, AutoReaction, AutoReactListener, Ban, Unban, Mute, Unmute, Lock, Unlock, Hide, Unhide, Kick, Warn, Role, Message, Moderation, TopCheck, Snipe, Global, QR, VanityRoles, ReactionRoles, Messages, TranslateCog, FastGreet, Jail, inviteTracker,Counting,AI, Economy
+        AntiWebhookDelete, AntiSpam, AntiCaps, AntiLink, AntiInvite, AntiMassMention, Stats, Status, NoPrefix, FilterCog, AutoReaction, AutoReactListener, Ban, Unban, Mute, Unmute, Lock, Unlock, Hide, Unhide, Kick, Warn, Role, Message, Moderation, TopCheck, Snipe, Global, QR, VanityRoles, ReactionRoles, Messages, TranslateCog, FastGreet, Jail, inviteTracker,Counting,AI
     ]
-
 
 
   await bot.add_cog(Help(bot))

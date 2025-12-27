@@ -65,13 +65,6 @@ class Chess:
                 f"Game over\nVariant end condition. | Score: `{results}`"
             )
 
-        if results == "1-0":
-            self.winner = self.white
-        elif results == "0-1":
-            self.winner = self.black
-        else:
-            self.winner = None
-
         embed.set_image(url=f"{self.BASE_URL}{self.board.board_fen()}")
         return embed
 
