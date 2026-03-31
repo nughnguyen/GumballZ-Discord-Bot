@@ -12,28 +12,28 @@ from utils.Tools import blacklist_check, ignore_check
 DB_PATH = "db/tts.db"
 COLOR = 0xFF0000
 
+# Số giây chờ idle trước khi tự disconnect khỏi voice
+IDLE_TIMEOUT = 180  # 3 phút
+
 
 async def setup_tts_db():
     """Tạo bảng lưu config TTS, tự migrate nếu schema cũ bị sai."""
     async with aiosqlite.connect(DB_PATH) as db:
-        # Kiểm tra bảng có tồn tại và có đúng cột không
         async with db.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='tts_config'"
         ) as cursor:
             table_exists = await cursor.fetchone()
 
         if table_exists:
-            # Kiểm tra schema thực tế
             async with db.execute("PRAGMA table_info(tts_config)") as cursor:
                 cols = {row[1] for row in await cursor.fetchall()}
             if "channel_id" not in cols:
-                # Schema cũ — drop và tạo lại
                 await db.execute("DROP TABLE tts_config")
                 await db.commit()
 
         await db.execute("""
             CREATE TABLE IF NOT EXISTS tts_config (
-                guild_id INTEGER PRIMARY KEY,
+                guild_id   INTEGER PRIMARY KEY,
                 channel_id INTEGER NOT NULL
             )
         """)
@@ -43,7 +43,6 @@ async def setup_tts_db():
 def _is_wavelink_playing(voice_client) -> bool:
     """Kiểm tra xem voice client có phải Wavelink Player đang phát nhạc không."""
     try:
-        import wavelink
         if isinstance(voice_client, wavelink.Player) and voice_client.playing:
             return True
     except Exception:
@@ -53,29 +52,22 @@ def _is_wavelink_playing(voice_client) -> bool:
 
 async def _speak(voice_client: discord.VoiceClient, text: str):
     """
-    Tạo audio TTS từ gTTS vào BytesIO buffer và phát qua FFmpegPCMAudio.
-    Không ghi file tạm ra đĩa — hoàn toàn in-memory.
-    Chờ cho đến khi audio phát xong.
+    Generate TTS audio in-memory (BytesIO) và phát qua FFmpegPCMAudio.
+    Chờ đến khi audio phát xong rồi mới return.
     """
     from gtts import gTTS
-
     loop = asyncio.get_event_loop()
 
-    # Tạo TTS trong thread pool để không block event loop
-    def _gen_audio():
+    def _gen():
         buf = io.BytesIO()
-        tts = gTTS(text=text, lang="vi", slow=False)
-        tts.write_to_fp(buf)
+        gTTS(text=text, lang="vi", slow=False).write_to_fp(buf)
         buf.seek(0)
         return buf
 
-    buf = await loop.run_in_executor(None, _gen_audio)
-
-    # FFmpegPCMAudio đọc từ pipe stdin
+    buf = await loop.run_in_executor(None, _gen)
     source = discord.FFmpegPCMAudio(buf, pipe=True)
     voice_client.play(source)
 
-    # Chờ đến khi phát xong
     while voice_client.is_playing():
         await asyncio.sleep(0.3)
 
@@ -85,27 +77,70 @@ class TTS(Cog, name="TTS"):
 
     def __init__(self, bot):
         self.bot = bot
-        # guild_id -> text_channel_id (cache in-memory, đồng bộ với DB)
+        # guild_id -> text_channel_id
         self._tts_channels: dict[int, int] = {}
-        # Lock per guild để tránh TTS chồng chéo nhau
+        # Lock per guild để tránh TTS chồng chéo
         self._locks: dict[int, asyncio.Lock] = {}
+        # Task idle-disconnect per guild
+        self._idle_tasks: dict[int, asyncio.Task] = {}
         bot.loop.create_task(self._init())
 
     async def _init(self):
         await setup_tts_db()
-        # Load toàn bộ config từ DB vào cache
         async with aiosqlite.connect(DB_PATH) as db:
             async with db.execute("SELECT guild_id, channel_id FROM tts_config") as cursor:
-                rows = await cursor.fetchall()
-                for guild_id, channel_id in rows:
+                for guild_id, channel_id in await cursor.fetchall():
                     self._tts_channels[guild_id] = channel_id
+
+    # ── Helpers ─────────────────────────────────────────────────────────────────
 
     def _get_lock(self, guild_id: int) -> asyncio.Lock:
         if guild_id not in self._locks:
             self._locks[guild_id] = asyncio.Lock()
         return self._locks[guild_id]
 
-    # ─────────────────────────────── DB helpers ─────────────────────────────────
+    def _reset_idle_timer(self, guild_id: int, vc: discord.VoiceClient):
+        """Hủy timer cũ và bắt đầu đếm ngược idle mới."""
+        old = self._idle_tasks.get(guild_id)
+        if old and not old.done():
+            old.cancel()
+        task = self.bot.loop.create_task(self._idle_disconnect(guild_id, vc))
+        self._idle_tasks[guild_id] = task
+
+    def _cancel_idle_timer(self, guild_id: int):
+        """Hủy idle timer nếu đang chạy (ví dụ khi music bắt đầu)."""
+        old = self._idle_tasks.pop(guild_id, None)
+        if old and not old.done():
+            old.cancel()
+
+    async def _idle_disconnect(self, guild_id: int, vc: discord.VoiceClient):
+        """
+        Chờ IDLE_TIMEOUT giây. Nếu hết giờ mà bot vẫn idle
+        (không phát nhạc, không có TTS) thì tự disconnect.
+        """
+        await asyncio.sleep(IDLE_TIMEOUT)
+        try:
+            # Lấy lại voice client hiện tại của guild
+            guild = self.bot.get_guild(guild_id)
+            if not guild:
+                return
+            current_vc = guild.voice_client
+            if not current_vc:
+                return
+
+            # Nếu đang phát nhạc (Wavelink) → không disconnect
+            if _is_wavelink_playing(current_vc):
+                return
+
+            # Nếu đang phát TTS → không disconnect (sẽ được reset sau)
+            if current_vc.is_playing():
+                return
+
+            await current_vc.disconnect(force=True)
+        except Exception:
+            pass
+
+    # ── DB helpers ───────────────────────────────────────────────────────────────
 
     async def _save_tts(self, guild_id: int, channel_id: int):
         self._tts_channels[guild_id] = channel_id
@@ -122,7 +157,18 @@ class TTS(Cog, name="TTS"):
             await db.execute("DELETE FROM tts_config WHERE guild_id = ?", (guild_id,))
             await db.commit()
 
-    # ─────────────────────────────── Commands ───────────────────────────────────
+    # ── Voice connect helper ─────────────────────────────────────────────────────
+
+    async def _ensure_connected(self, guild: discord.Guild, channel: discord.VoiceChannel) -> discord.VoiceClient:
+        """Join / move đến đúng channel, trả về VoiceClient hiện tại."""
+        vc = guild.voice_client
+        if vc is None:
+            return await channel.connect()
+        if vc.channel != channel:
+            await vc.move_to(channel)
+        return vc
+
+    # ── Commands ─────────────────────────────────────────────────────────────────
 
     @commands.command(
         name="say",
@@ -133,73 +179,56 @@ class TTS(Cog, name="TTS"):
     @ignore_check()
     @commands.cooldown(1, 5, commands.BucketType.user)
     async def say(self, ctx: Context, *, text: str):
-        """Đọc to một đoạn văn bản trong voice channel."""
-        # Kiểm tra người dùng có trong voice channel không
         if not ctx.author.voice or not ctx.author.voice.channel:
-            embed = discord.Embed(
-                description="❌ Bạn phải ở trong một voice channel để dùng lệnh này.",
-                color=COLOR
+            return await ctx.reply(
+                embed=discord.Embed(description="❌ Bạn phải ở trong voice channel để dùng lệnh này.", color=COLOR),
+                mention_author=False
             )
-            return await ctx.reply(embed=embed, mention_author=False)
 
-        vc_channel = ctx.author.voice.channel
         guild_vc = ctx.guild.voice_client
 
-        # Nếu đang phát nhạc → không đọc
+        # Đang phát nhạc Wavelink → không đọc
         if guild_vc and _is_wavelink_playing(guild_vc):
-            embed = discord.Embed(
-                description="🎵 Bot đang phát nhạc, không thể đọc TTS lúc này.",
-                color=COLOR
+            return await ctx.reply(
+                embed=discord.Embed(description="🎵 Bot đang phát nhạc, không thể đọc TTS lúc này.", color=COLOR),
+                mention_author=False
             )
-            return await ctx.reply(embed=embed, mention_author=False)
 
-        # Nếu bot đang trong VC khác và đang phát audio → từ chối
+        # Đang phát TTS khác → không đọc
         if guild_vc and guild_vc.is_playing():
-            embed = discord.Embed(
-                description="🔊 Bot đang nói chuyện, vui lòng chờ.",
-                color=COLOR
+            return await ctx.reply(
+                embed=discord.Embed(description="🔊 Bot đang bận, vui lòng chờ.", color=COLOR),
+                mention_author=False
             )
-            return await ctx.reply(embed=embed, mention_author=False)
 
         lock = self._get_lock(ctx.guild.id)
-
         async with lock:
             try:
-                # Connect hoặc move đến đúng channel
-                if guild_vc is None:
-                    vc = await vc_channel.connect()
-                elif guild_vc.channel != vc_channel:
-                    await guild_vc.move_to(vc_channel)
-                    vc = guild_vc
-                else:
-                    vc = guild_vc
+                vc = await self._ensure_connected(ctx.guild, ctx.author.voice.channel)
 
-                confirm = discord.Embed(
-                    description=f"🔊 Đang đọc: **{discord.utils.escape_markdown(text[:80])}{'...' if len(text) > 80 else ''}**",
-                    color=COLOR
-                )
-                await ctx.reply(embed=confirm, mention_author=False)
-
-                await _speak(vc, text)
-
-            except discord.ClientException as e:
+                preview = discord.utils.escape_markdown(text[:80])
+                suffix = "..." if len(text) > 80 else ""
                 await ctx.reply(
-                    embed=discord.Embed(description=f"❌ Lỗi kết nối voice: {e}", color=COLOR),
+                    embed=discord.Embed(description=f"🔊 Đang đọc: **{preview}{suffix}**", color=COLOR),
                     mention_author=False
                 )
+
+                # Hủy idle timer trong lúc đọc
+                self._cancel_idle_timer(ctx.guild.id)
+                await _speak(vc, text)
+
             except Exception as e:
                 await ctx.reply(
                     embed=discord.Embed(description=f"❌ Lỗi TTS: {e}", color=COLOR),
                     mention_author=False
                 )
             finally:
-                # Disconnect nếu không có auto-TTS đang bật
-                vc_after = ctx.guild.voice_client
-                if vc_after and not isinstance(vc_after, wavelink.Player):
-                    if not vc_after.is_playing():
-                        await vc_after.disconnect()
+                # Sau khi đọc xong → bắt đầu đếm idle
+                current_vc = ctx.guild.voice_client
+                if current_vc and not isinstance(current_vc, wavelink.Player):
+                    self._reset_idle_timer(ctx.guild.id, current_vc)
 
-    # ─── Group: >tts ─────────────────────────────────────────────────────────────
+    # ── Group: >tts ──────────────────────────────────────────────────────────────
 
     @commands.group(
         name="tts",
@@ -223,7 +252,6 @@ class TTS(Cog, name="TTS"):
     @commands.has_permissions(manage_guild=True)
     @commands.cooldown(1, 5, commands.BucketType.guild)
     async def tts_set(self, ctx: Context, channel: discord.TextChannel):
-        """Cài đặt kênh text để TTS tự động."""
         await self._save_tts(ctx.guild.id, channel.id)
         embed = discord.Embed(
             title="<:tick:1453391589148983367> TTS Đã Bật",
@@ -231,6 +259,7 @@ class TTS(Cog, name="TTS"):
                 f"✅ Kênh TTS đã được đặt thành {channel.mention}.\n\n"
                 f"📌 Khi bạn ở trong **voice channel**, mọi tin nhắn bạn gửi vào {channel.mention} "
                 f"sẽ được bot đọc to.\n\n"
+                f"⏱️ Bot sẽ tự rời phòng sau **{IDLE_TIMEOUT // 60} phút** không có hoạt động.\n"
                 f"⚠️ Bot sẽ không đọc nếu đang phát nhạc."
             ),
             color=COLOR
@@ -248,27 +277,28 @@ class TTS(Cog, name="TTS"):
     @commands.has_permissions(manage_guild=True)
     @commands.cooldown(1, 5, commands.BucketType.guild)
     async def tts_clear(self, ctx: Context):
-        """Tắt TTS tự động."""
         if ctx.guild.id not in self._tts_channels:
-            embed = discord.Embed(
-                description="ℹ️ TTS chưa được bật trong server này.",
-                color=COLOR
+            return await ctx.reply(
+                embed=discord.Embed(description="ℹ️ TTS chưa được bật trong server này.", color=COLOR),
+                mention_author=False
             )
-            return await ctx.reply(embed=embed, mention_author=False)
 
         await self._clear_tts(ctx.guild.id)
+        self._cancel_idle_timer(ctx.guild.id)
 
-        # Disconnect bot nếu đang ở VC chỉ vì TTS
+        # Disconnect ngay nếu bot đang ở VC chỉ vì TTS
         guild_vc = ctx.guild.voice_client
         if guild_vc and not isinstance(guild_vc, wavelink.Player) and not guild_vc.is_playing():
             await guild_vc.disconnect()
 
-        embed = discord.Embed(
-            title="<:tick:1453391589148983367> TTS Đã Tắt",
-            description="✅ Tính năng TTS tự động đã được tắt cho server này.",
-            color=COLOR
+        await ctx.reply(
+            embed=discord.Embed(
+                title="<:tick:1453391589148983367> TTS Đã Tắt",
+                description="✅ Tính năng TTS tự động đã được tắt.",
+                color=COLOR
+            ),
+            mention_author=False
         )
-        await ctx.reply(embed=embed, mention_author=False)
 
     @tts.command(
         name="status",
@@ -279,7 +309,6 @@ class TTS(Cog, name="TTS"):
     @ignore_check()
     @commands.cooldown(1, 5, commands.BucketType.user)
     async def tts_status(self, ctx: Context):
-        """Xem trạng thái TTS."""
         channel_id = self._tts_channels.get(ctx.guild.id)
         if not channel_id:
             embed = discord.Embed(
@@ -291,18 +320,20 @@ class TTS(Cog, name="TTS"):
             ch_mention = channel.mention if channel else f"ID: {channel_id} (đã bị xóa)"
             embed = discord.Embed(
                 title="🔊 Trạng thái TTS",
-                description=f"TTS đang bật cho kênh: {ch_mention}",
+                description=(
+                    f"TTS đang bật cho kênh: {ch_mention}\n"
+                    f"⏱️ Auto-disconnect sau: **{IDLE_TIMEOUT // 60} phút** idle"
+                ),
                 color=COLOR
             )
         embed.set_footer(text=f"Yêu cầu bởi {ctx.author}", icon_url=ctx.author.display_avatar.url)
         await ctx.reply(embed=embed, mention_author=False)
 
-    # ─────────────────────────────── Event Listener ─────────────────────────────
+    # ── Event Listener ───────────────────────────────────────────────────────────
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         """Tự động đọc tin nhắn trong kênh TTS đã cài."""
-        # Bỏ qua: DM, bot, không có guild, không cấu hình
         if not message.guild or message.author.bot:
             return
 
@@ -310,54 +341,62 @@ class TTS(Cog, name="TTS"):
         if not channel_id or message.channel.id != channel_id:
             return
 
-        # Bỏ qua nếu người gửi không trong voice channel
         member = message.guild.get_member(message.author.id)
         if not member or not member.voice or not member.voice.channel:
             return
 
-        # Bỏ qua tin nhắn trống hoặc chỉ có attachment
         text = message.content.strip()
-        if not text:
-            return
-
-        # Bỏ qua lệnh bot (bắt đầu bằng prefix)
-        if text.startswith(">") or text.startswith("/"):
+        if not text or text.startswith(">") or text.startswith("/"):
             return
 
         guild_vc = message.guild.voice_client
 
-        # Nếu đang phát nhạc Wavelink → bỏ qua
         if guild_vc and _is_wavelink_playing(guild_vc):
             return
 
-        # Nếu bot đang nói (TTS khác) → bỏ qua (không queue)
         if guild_vc and guild_vc.is_playing():
             return
 
-        vc_channel = member.voice.channel
         lock = self._get_lock(message.guild.id)
-
         async with lock:
             try:
-                if guild_vc is None:
-                    vc = await vc_channel.connect()
-                elif guild_vc.channel != vc_channel:
-                    await guild_vc.move_to(vc_channel)
-                    vc = guild_vc
-                else:
-                    vc = guild_vc
+                vc = await self._ensure_connected(message.guild, member.voice.channel)
 
-                # Cắt text quá dài để tránh TTS quá lâu
-                speak_text = text[:300]
-                await _speak(vc, speak_text)
+                self._cancel_idle_timer(message.guild.id)
+                await _speak(vc, text[:300])
 
             except Exception:
-                pass  # Lỗi TTS tự động không cần báo lại user
+                pass
             finally:
-                # Disconnect nếu không có ai còn trong VC
-                vc_after = message.guild.voice_client
-                if vc_after and not isinstance(vc_after, wavelink.Player):
-                    if not vc_after.is_playing():
-                        # Kiểm tra có ai còn trong VC không
-                        if len(vc_after.channel.members) <= 1:
-                            await vc_after.disconnect()
+                current_vc = message.guild.voice_client
+                if current_vc and not isinstance(current_vc, wavelink.Player):
+                    self._reset_idle_timer(message.guild.id, current_vc)
+
+    @commands.Cog.listener()
+    async def on_voice_state_update(
+        self,
+        member: discord.Member,
+        before: discord.VoiceState,
+        after: discord.VoiceState
+    ):
+        """
+        Khi channel trở nên trống (chỉ còn bot) → bắt đầu idle timer.
+        Khi có người join lại → hủy idle timer.
+        """
+        guild = member.guild
+        guild_vc = guild.voice_client
+        if not guild_vc or isinstance(guild_vc, wavelink.Player):
+            return
+
+        bot_channel = guild_vc.channel
+        if not bot_channel:
+            return
+
+        human_members = [m for m in bot_channel.members if not m.bot]
+
+        if not human_members:
+            # Không còn ai → bắt đầu đếm idle
+            self._reset_idle_timer(guild.id, guild_vc)
+        else:
+            # Có người → hủy idle timer (ai đó đang ở cùng)
+            self._cancel_idle_timer(guild.id)
