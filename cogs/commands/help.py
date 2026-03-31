@@ -134,6 +134,7 @@ class HelpCommand(commands.HelpCommand):
         name=" <:module:1453391552029135000>  __**Extra Features**__",
         value=">>> \n <:cast:1453391688763576421>  `»` Advance Logging\n"
               " <:starr:1453391665145446400>  `»` Vanityroles\n"
+              " <:unmute:1453391593917907147>  `»` TTS <:New:1453394998807625820>\n"
               " <:counting:1453394890342793318>  `»` Counting <:New:1453394998807625820>\n"
               " <:system:1453395385962987630>  `»` J2C <:New:1453394998807625820>\n"
               " <:ai:1453395017681993730>  `»` AI <:New:1453394998807625820>\n"
@@ -147,7 +148,6 @@ class HelpCommand(commands.HelpCommand):
               " <:circle:1453395027211456575>  `»` Birthday <:New:1453394998807625820>\n"
               " <:circle:1453391690848276614>  `»` Customrole\n"
               " <:coin:1449205470861459546>  `»` Economy <:New:1453394998807625820>\n" 
-              " <:unmute:1453391593917907147>  `»` TTS <:New:1453394998807625820>\n"
     )
 
     embed.set_footer(
