@@ -128,7 +128,6 @@ class HelpCommand(commands.HelpCommand):
               " <:tada:1453391586737131695>  `»` Giveaway\n"
               " <:ticket:1453391591698862191>  `»` Ticket <:New:1453394998807625820>\n"
               " <:people:1453391564088021152>  `»` Invite Tracker <:New:1453394998807625820>\n"
-              " 🔊  `»` TTS <:New:1453394998807625820>\n"
     )
     
     embed.add_field(
@@ -148,6 +147,7 @@ class HelpCommand(commands.HelpCommand):
               " <:circle:1453395027211456575>  `»` Birthday <:New:1453394998807625820>\n"
               " <:circle:1453391690848276614>  `»` Customrole\n"
               " <:coin:1449205470861459546>  `»` Economy <:New:1453394998807625820>\n" 
+              " <:unmute:1453391593917907147>  `»` TTS <:New:1453394998807625820>\n"
     )
 
     embed.set_footer(
