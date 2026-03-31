@@ -128,13 +128,13 @@ class HelpCommand(commands.HelpCommand):
               " <:tada:1453391586737131695>  `»` Giveaway\n"
               " <:ticket:1453391591698862191>  `»` Ticket <:New:1453394998807625820>\n"
               " <:people:1453391564088021152>  `»` Invite Tracker <:New:1453394998807625820>\n"
+              " 🔊  `»` TTS <:New:1453394998807625820>\n"
     )
     
     embed.add_field(
         name=" <:module:1453391552029135000>  __**Extra Features**__",
         value=">>> \n <:cast:1453391688763576421>  `»` Advance Logging\n"
               " <:starr:1453391665145446400>  `»` Vanityroles\n"
-              
               " <:counting:1453394890342793318>  `»` Counting <:New:1453394998807625820>\n"
               " <:system:1453395385962987630>  `»` J2C <:New:1453394998807625820>\n"
               " <:ai:1453395017681993730>  `»` AI <:New:1453394998807625820>\n"

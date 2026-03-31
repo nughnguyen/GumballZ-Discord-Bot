@@ -35,22 +35,26 @@ class View(discord.ui.View):
         self.options, self.embeds, self.total_pages = self.gen_embeds()
 
         if ui == 0:
-            self.add_item(Dropdown(ctx=self.ctx, options=self.options))
+            # Cắt tối đa 25 options (Discord limit)
+            self.add_item(Dropdown(ctx=self.ctx, options=self.options[:25]))
         elif ui == 1:
             self.buttons = self.add_buttons()
         elif ui == 2:
             self.buttons = self.add_buttons()
+            # Chia options thành 2 dropdown, mỗi cái tối đa 25 (Discord limit)
+            # Row 0 = buttons, row 1 = dropdown 1, row 2 = dropdown 2
+            # Trừ đi "Home" đã ở index 0, chia phần còn lại
             mid_point = len(self.options) // 2
-            options_1 = self.options[:mid_point]
-            options_2 = self.options[mid_point:]
+            options_1 = self.options[:mid_point][:25]
+            options_2 = self.options[mid_point:][:25]
 
             if options_1:
-                self.add_item(Dropdown(ctx=self.ctx, options=options_1, placeholder="Main Commands", row=1))
+                self.add_item(Dropdown(ctx=self.ctx, options=options_1, placeholder="📋 Main Commands", row=1))
             if options_2:
-                self.add_item(Dropdown(ctx=self.ctx, options=options_2, placeholder="Extra Commands", row=2))
+                self.add_item(Dropdown(ctx=self.ctx, options=options_2, placeholder="⚡ Extra Commands", row=2))
         else:
             self.buttons = self.add_buttons()
-            self.add_item(Dropdown(ctx=self.ctx, options=self.options))
+            self.add_item(Dropdown(ctx=self.ctx, options=self.options[:25]))
 
     def add_buttons(self):
         self.homeB = discord.ui.Button(label="", emoji="<:rewind:1453652995991404584>", style=discord.ButtonStyle.secondary)

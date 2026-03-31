@@ -69,6 +69,7 @@ from .commands.Birthday import Birthdays
 from .commands.nitro import Nitro
 from .commands.image import ImageCommands
 from .commands.youtube import Youtube
+from .commands.tts import TTS
 #____________ Events _____________
 
 #from .events.autoblacklist import AutoBlacklist
@@ -115,6 +116,7 @@ from .gumballz.encryption import _encrypt
 from .gumballz.mc import _mc
 from .gumballz.joindm import _joindm
 from .gumballz.birth import _birth
+from .gumballz.tts import _tts
 
 #########ANTINUKE#########
 
@@ -246,6 +248,7 @@ async def setup(bot: gumballz):
   await bot.add_cog(Nitro(bot))
   await bot.add_cog(ImageCommands(bot))
   await bot.add_cog(Youtube(bot))
+  await bot.add_cog(TTS(bot))
 
   await bot.add_cog(_antinuke(bot))
   await bot.add_cog(_extra(bot))
@@ -276,6 +279,7 @@ async def setup(bot: gumballz):
   await bot.add_cog(_mc(bot))
   await bot.add_cog(_joindm(bot))
   await bot.add_cog(_birth(bot))
+  await bot.add_cog(_tts(bot))
 
 
   
