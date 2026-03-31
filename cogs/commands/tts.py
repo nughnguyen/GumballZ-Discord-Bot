@@ -14,8 +14,23 @@ COLOR = 0xFF0000
 
 
 async def setup_tts_db():
-    """Tạo bảng lưu config TTS cho mỗi guild."""
+    """Tạo bảng lưu config TTS, tự migrate nếu schema cũ bị sai."""
     async with aiosqlite.connect(DB_PATH) as db:
+        # Kiểm tra bảng có tồn tại và có đúng cột không
+        async with db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='tts_config'"
+        ) as cursor:
+            table_exists = await cursor.fetchone()
+
+        if table_exists:
+            # Kiểm tra schema thực tế
+            async with db.execute("PRAGMA table_info(tts_config)") as cursor:
+                cols = {row[1] for row in await cursor.fetchall()}
+            if "channel_id" not in cols:
+                # Schema cũ — drop và tạo lại
+                await db.execute("DROP TABLE tts_config")
+                await db.commit()
+
         await db.execute("""
             CREATE TABLE IF NOT EXISTS tts_config (
                 guild_id INTEGER PRIMARY KEY,
