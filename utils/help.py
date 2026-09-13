@@ -1,6 +1,48 @@
 import discord
-import functools
+import re
 from utils.Tools import *
+
+# Navigation button emojis (edit IDs here if you re-upload)
+NAV_EMOJIS = {
+    "home": "<:rewind:1453652995991404584>",
+    "back": "<:icons_next:1453658490248626258>",  # flipped via back callback; keep a valid ID from your server
+    "quit": "<:delete:1453602008786534514>",
+    "next": "<:icons_next:1453658490248626258>",
+    "last": "<:forward:1453664212768260187>",
+    "home_select": "<:icon_home:1453800906519871629>",
+}
+
+NAV_FALLBACK = {
+    "home": "⏪",
+    "back": "◀️",
+    "quit": "🗑️",
+    "next": "▶️",
+    "last": "⏩",
+    "home_select": "🏠",
+    "category": "📂",
+}
+
+_CUSTOM_RE = re.compile(r"<a?:([a-zA-Z0-9_]+):(\d+)>")
+
+
+def resolve_component_emoji(bot: discord.Client, emoji_str: str, fallback: str = "📂"):
+    """Use custom emoji on buttons/selects only if the bot can access it."""
+    if not emoji_str:
+        return fallback
+    if not emoji_str.startswith("<"):
+        return emoji_str
+
+    match = _CUSTOM_RE.fullmatch(emoji_str.strip())
+    if not match:
+        return fallback
+
+    name, emoji_id = match.group(1), int(match.group(2))
+    cached = bot.get_emoji(emoji_id) if bot else None
+    if cached is not None:
+        return cached
+
+    # Bot cannot see this emoji → unicode fallback (avoids Discord 400 on components)
+    return fallback
 
 
 class Dropdown(discord.ui.Select):
@@ -35,15 +77,11 @@ class View(discord.ui.View):
         self.options, self.embeds, self.total_pages = self.gen_embeds()
 
         if ui == 0:
-            # Cắt tối đa 25 options (Discord limit)
             self.add_item(Dropdown(ctx=self.ctx, options=self.options[:25]))
         elif ui == 1:
             self.buttons = self.add_buttons()
         elif ui == 2:
             self.buttons = self.add_buttons()
-            # Chia options thành 2 dropdown, mỗi cái tối đa 25 (Discord limit)
-            # Row 0 = buttons, row 1 = dropdown 1, row 2 = dropdown 2
-            # Trừ đi "Home" đã ở index 0, chia phần còn lại
             mid_point = len(self.options) // 2
             options_1 = self.options[:mid_point][:25]
             options_2 = self.options[mid_point:][:25]
@@ -57,19 +95,24 @@ class View(discord.ui.View):
             self.add_item(Dropdown(ctx=self.ctx, options=self.options[:25]))
 
     def add_buttons(self):
-        self.homeB = discord.ui.Button(label="", emoji="<:rewind:1453652995991404584>", style=discord.ButtonStyle.secondary)
+        bot = self.ctx.bot
+
+        def btn(key: str) -> discord.PartialEmoji | str:
+            return resolve_component_emoji(bot, NAV_EMOJIS[key], NAV_FALLBACK[key])
+
+        self.homeB = discord.ui.Button(label="", emoji=btn("home"), style=discord.ButtonStyle.secondary)
         self.homeB.callback = self.home_callback
 
-        self.backB = discord.ui.Button(label="", emoji="<:next:1327829548426854522>", style=discord.ButtonStyle.secondary)
+        self.backB = discord.ui.Button(label="", emoji=btn("back"), style=discord.ButtonStyle.secondary)
         self.backB.callback = self.back_callback
 
-        self.quitB = discord.ui.Button(label="", emoji="<:delete:1453602008786534514>", style=discord.ButtonStyle.danger)
+        self.quitB = discord.ui.Button(label="", emoji=btn("quit"), style=discord.ButtonStyle.danger)
         self.quitB.callback = self.quit_callback
 
-        self.nextB = discord.ui.Button(label="", emoji="<:icons_next:1453658490248626258>", style=discord.ButtonStyle.secondary)
+        self.nextB = discord.ui.Button(label="", emoji=btn("next"), style=discord.ButtonStyle.secondary)
         self.nextB.callback = self.next_callback
 
-        self.lastB = discord.ui.Button(label="", emoji="<:forward:1453664212768260187>", style=discord.ButtonStyle.secondary)
+        self.lastB = discord.ui.Button(label="", emoji=btn("last"), style=discord.ButtonStyle.secondary)
         self.lastB.callback = self.last_callback
 
         buttons = [self.homeB, self.backB, self.quitB, self.nextB, self.lastB]
@@ -113,7 +156,7 @@ class View(discord.ui.View):
         i = 0
         used_labels = set()
         for cog in self.get_cogs():
-            if cog.__class__.__name__ == "Roleplay":
+            if cog is None or cog.__class__.__name__ == "Roleplay":
                 continue
             if "help_custom" in dir(cog):
                 _, label, _ = cog.help_custom()
@@ -135,42 +178,57 @@ class View(discord.ui.View):
         options, embeds = [], []
         total_pages = 0
         used_labels = set()
+        bot = self.ctx.bot
 
-        options.append(discord.SelectOption(label="Home", emoji='<:icon_home:1453800906519871629>', description=""))
+        home_emoji = resolve_component_emoji(
+            bot, NAV_EMOJIS["home_select"], NAV_FALLBACK["home_select"]
+        )
+        options.append(discord.SelectOption(label="Home", emoji=home_emoji, description="Main menu"))
         embeds.append(self.home)
         total_pages += 1
         used_labels.add("Home")
 
         for cog in self.get_cogs():
-            if cog.__class__.__name__ == "Roleplay":
+            if cog is None or cog.__class__.__name__ == "Roleplay":
                 continue
-            if "help_custom" in dir(cog):
-                emoji, label, description = cog.help_custom()
-                original_label = label
-                counter = 1
-                while label in used_labels:
-                    label = f"{original_label} {counter}"
-                    counter += 1
-                used_labels.add(label)
-                options.append(discord.SelectOption(label=label, emoji=emoji, description=description))
-                embed = discord.Embed(title=f"{emoji} {original_label}", color=0xFF0000)
+            if "help_custom" not in dir(cog):
+                continue
+            emoji, label, description = cog.help_custom()
+            original_label = label
+            counter = 1
+            while label in used_labels:
+                label = f"{original_label} {counter}"
+                counter += 1
+            used_labels.add(label)
 
-                for command in cog.get_commands():
-                    params = ""
-                    for param in command.clean_params:
-                        if param not in ["self", "ctx"]:
-                            params += f" <{param}>"
-                    help_text = command.help or "No description available"
-                    if len(help_text) > 1020:
-                        help_text = help_text[:1017] + "..."
-                    embed.add_field(name=f"{command.name}{params}",
-                                    value=f"{help_text}\n•",
-                                    inline=False)
-                embeds.append(embed)
-                total_pages += 1
+            select_emoji = resolve_component_emoji(bot, emoji, NAV_FALLBACK["category"])
+            options.append(
+                discord.SelectOption(
+                    label=label[:100],
+                    emoji=select_emoji,
+                    description=(description or "Category")[:100],
+                )
+            )
 
-        self.home.set_footer(text=f"• Help page 1/{total_pages} | Requested by: {self.ctx.author.display_name}",
-                             icon_url=f"{self.ctx.bot.user.avatar.url}")
+            # Embed titles can always show custom emoji markup
+            embed = discord.Embed(title=f"{emoji} {original_label}", color=0xFF0000)
+            for command in cog.get_commands():
+                params = "".join(f" <{param}>" for param in command.clean_params if param not in ["self", "ctx"])
+                help_text = command.help or "No description available"
+                if len(help_text) > 1020:
+                    help_text = help_text[:1017] + "..."
+                field_name = f"{command.name}{params}"[:256]
+                if len(embed.fields) >= 25:
+                    break
+                embed.add_field(name=field_name, value=f"{help_text}\n•", inline=False)
+            embeds.append(embed)
+            total_pages += 1
+
+        avatar = self.ctx.bot.user.display_avatar.url if self.ctx.bot.user else None
+        self.home.set_footer(
+            text=f"• Help page 1/{total_pages} | Requested by: {self.ctx.author.display_name}",
+            icon_url=avatar,
+        )
         return options, embeds, total_pages
 
     async def quit(self, interaction: discord.Interaction):
@@ -181,8 +239,11 @@ class View(discord.ui.View):
         if not self.index + page < 0 or not self.index + page > len(self.options):
             await self.set_index(page)
             embed = self.embeds[self.index]
-            embed.set_footer(text=f"• Help page {self.index + 1}/{self.total_pages} | Requested by: {self.ctx.author.display_name}",
-                             icon_url=f"{self.ctx.bot.user.avatar.url}")
+            avatar = self.ctx.bot.user.display_avatar.url if self.ctx.bot.user else None
+            embed.set_footer(
+                text=f"• Help page {self.index + 1}/{self.total_pages} | Requested by: {self.ctx.author.display_name}",
+                icon_url=avatar,
+            )
             await interaction.response.edit_message(embed=embed, view=self)
 
     async def set_page(self, page: int, interaction: discord.Interaction):

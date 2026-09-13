@@ -1,73 +1,59 @@
-import os
-os.system("")
 import asyncio
-import traceback
-from threading import Thread
-from datetime import datetime
+import os
+import platform
 import random
 import time
 
 import aiohttp
 import discord
 from discord import Spotify
-from discord.ext import commands, tasks
+from discord.ext import commands
+from dotenv import load_dotenv
 
 from core import Context
-from core.Cog import Cog
 from core.gumballz import gumballz
-from utils.Tools import *
-from utils.config import *
 
-import jishaku
-import cogs
+load_dotenv()
+
+TOKEN = os.getenv("TOKEN")
+SERVER_COUNT_CHANNEL_ID = int(os.getenv("SERVER_COUNT_CHANNEL_ID", "1453239949490126930"))
+USER_COUNT_CHANNEL_ID = int(os.getenv("USER_COUNT_CHANNEL_ID", "1453240025780060231"))
+LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "1305771283199561852"))
+COMMAND_LOG_WEBHOOK = os.getenv("COMMAND_LOG_WEBHOOK", "")
+KEEP_ALIVE = os.getenv("KEEP_ALIVE", "false").lower() in ("1", "true", "yes")
 
 os.environ["JISHAKU_NO_DM_TRACEBACK"] = "False"
 os.environ["JISHAKU_HIDE"] = "True"
 os.environ["JISHAKU_NO_UNDERSCORE"] = "True"
 os.environ["JISHAKU_FORCE_PAGINATOR"] = "True"
 
-from dotenv import load_dotenv
-load_dotenv()
-TOKEN = os.getenv("TOKEN")
-
-# --- Configuration ---
-# IMPORTANT: Replace these with your actual channel IDs.
-SERVER_COUNT_CHANNEL_ID = 1453239949490126930  # Replace with your server count channel ID
-USER_COUNT_CHANNEL_ID = 1453240025780060231    # Replace with your user count channel ID
-LOG_CHANNEL_ID = 1305771283199561852 # Replace with the channel ID for join/leave logs
-
-
 client = gumballz()
-tree = client.tree
 
-# --- Background Task for Stats ---
+
 async def update_stats():
-    """A background task to update server and user stats in channel names."""
+    """Update server/user count channel names every 10 minutes."""
     await client.wait_until_ready()
     while not client.is_closed():
         try:
             servers = len(client.guilds)
-            users = sum(guild.member_count for guild in client.guilds if guild.member_count is not None)
-            
+            users = sum(g.member_count for g in client.guilds if g.member_count is not None)
+
             server_channel = client.get_channel(SERVER_COUNT_CHANNEL_ID)
             user_channel = client.get_channel(USER_COUNT_CHANNEL_ID)
-            
+
             if server_channel:
                 await server_channel.edit(name=f"Servers: {servers}")
-            
             if user_channel:
                 await user_channel.edit(name=f"Users: {users}")
-                
         except Exception as e:
             print(f"Error updating stats: {e}")
-        
-        await asyncio.sleep(600) # Update every 10 minutes
 
-# --- Event Handlers ---
+        await asyncio.sleep(600)
+
+
 @client.event
 async def on_ready():
     await client.wait_until_ready()
-    
     print("""
         \033[1;31m
  ██████╗ ██╗   ██╗███╗   ███╗██████╗  █████╗ ██╗     ██╗     ███████╗
@@ -85,37 +71,32 @@ async def on_ready():
     print(f"Connected to: {len(client.users)} users")
     try:
         synced = await client.tree.sync()
-        all_commands = list(client.commands)
-        print(f"Synced Total {len(all_commands)} Client Commands and {len(synced)} Slash Commands")
+        print(f"Synced Total {len(list(client.commands))} Client Commands and {len(synced)} Slash Commands")
     except Exception as e:
         print(e)
-        
+
     client.loop.create_task(update_stats())
 
 
 @client.event
 async def on_guild_join(guild: discord.Guild):
-    # Log when the bot joins a server
     log_channel = client.get_channel(LOG_CHANNEL_ID)
     if log_channel:
-        await log_channel.send(f"GumballZ has been added to the server: **{guild.name}** (ID: `{guild.id}`)")
+        await log_channel.send(
+            f"GumballZ has been added to the server: **{guild.name}** (ID: `{guild.id}`)"
+        )
+
 
 @client.event
 async def on_command_completion(context: commands.Context) -> None:
-    if context.author.id == 561443914062757908:
+    if context.author.id == 561443914062757908 or not COMMAND_LOG_WEBHOOK:
         return
 
-    full_command_name = context.command.qualified_name
-    split = full_command_name.split("\n")
-    executed_command = str(split[0])
-    webhook_url = "https://discord.com/api/webhooks/1375481406716645489/CoVmoIm_a68AJZ9QnectGZ4BLqLiC6i7_JB6Cl2OZK1B872d3Pg2hQ6Fnj3iTh0s3dq9"
+    executed_command = context.command.qualified_name.split("\n")[0]
     async with aiohttp.ClientSession() as session:
-        webhook = discord.Webhook.from_url(webhook_url, session=session)
-
-        embed_color = 0xFF0000
-        embed = discord.Embed(color=embed_color)
+        webhook = discord.Webhook.from_url(COMMAND_LOG_WEBHOOK, session=session)
+        embed = discord.Embed(color=0xFF0000)
         avatar_url = context.author.display_avatar.url
-
         embed.set_author(name=f"Cmd Executed: {executed_command}", icon_url=avatar_url)
         embed.set_thumbnail(url=avatar_url)
 
@@ -125,30 +106,28 @@ async def on_command_completion(context: commands.Context) -> None:
             embed.add_field(name="Channel", value=f"{context.channel.mention} (`{context.channel.id}`)", inline=False)
         else:
             embed.add_field(name="User (DM)", value=f"{context.author.mention} (`{context.author.id}`)", inline=False)
-        
+
         embed.timestamp = discord.utils.utcnow()
         embed.set_footer(text="GumballZ™ ❤️", icon_url=client.user.display_avatar.url)
-        
+
         try:
             await webhook.send(embed=embed)
         except Exception as e:
-            print(f'Command log webhook failed: {e}')
+            print(f"Command log webhook failed: {e}")
 
 
-# --- Utility Commands ---
-@client.command(name='spotify')
+@client.command(name="spotify")
 async def spotify(ctx: Context, user: discord.Member = None):
     """Shows what a user is listening to on Spotify."""
     user = user or ctx.author
-    spotify_activity = next((activity for activity in user.activities if isinstance(activity, Spotify)), None)
-
+    spotify_activity = next((a for a in user.activities if isinstance(a, Spotify)), None)
     if not spotify_activity:
         return await ctx.send(f"{user.name} is not listening to Spotify.")
-    
+
     embed = discord.Embed(
         title=f"{user.name}'s Spotify",
         description=f"**Listening to:** {spotify_activity.title}",
-        color=0x1DB954 # Spotify Green
+        color=0x1DB954,
     )
     embed.set_thumbnail(url=spotify_activity.album_cover_url)
     embed.add_field(name="Artist", value=spotify_activity.artist)
@@ -157,20 +136,22 @@ async def spotify(ctx: Context, user: discord.Member = None):
     await ctx.send(embed=embed)
 
 
-@client.command(name='makeinvite', aliases=['createinvite', 'makeinv'])
+@client.command(name="makeinvite", aliases=["createinvite", "makeinv"])
 @commands.is_owner()
 async def make_invite(ctx: Context, guild_id: int = None):
     """Creates an invite for a specified server (owner only)."""
     if guild_id is None:
         return await ctx.send("Please provide a Guild ID.")
-        
+
     guild = client.get_guild(guild_id)
     if not guild:
         return await ctx.send("Invalid Guild ID. I am not in that server.")
 
     if guild.system_channel and guild.system_channel.permissions_for(guild.me).create_instant_invite:
         try:
-            invite = await guild.system_channel.create_invite(max_age=0, max_uses=0, unique=True, reason="Owner requested invite.")
+            invite = await guild.system_channel.create_invite(
+                max_age=0, max_uses=0, unique=True, reason="Owner requested invite."
+            )
             return await ctx.send(f"Invite for **{guild.name}**:\n{invite.url}")
         except Exception:
             pass
@@ -178,30 +159,34 @@ async def make_invite(ctx: Context, guild_id: int = None):
     for channel in guild.text_channels:
         if channel.permissions_for(guild.me).create_instant_invite:
             try:
-                invite = await channel.create_invite(max_age=0, max_uses=0, unique=True, reason="Owner requested invite.")
+                invite = await channel.create_invite(
+                    max_age=0, max_uses=0, unique=True, reason="Owner requested invite."
+                )
                 return await ctx.send(f"Invite for **{guild.name}** (from #{channel.name}):\n{invite.url}")
             except Exception:
                 continue
-                
+
     await ctx.send(f"I don't have 'Create Instant Invite' permission in any channel in **{guild.name}**.")
 
 
-# --- Webhook Management Commands ---
-@client.command(name='create_hook', aliases=['makehook'])
+@client.command(name="create_hook", aliases=["makehook"])
 @commands.has_permissions(administrator=True)
 async def create_hook(ctx: Context, *, name: str = None):
     """Creates a webhook in the current channel."""
     if name is None:
         return await ctx.send("Please provide a name for the webhook.")
-    
+
     try:
         webhook = await ctx.channel.create_webhook(name=name, reason=f"Created by {ctx.author}")
         embed = discord.Embed(
             title="✅ Webhook Created",
             description=f"A webhook named **{webhook.name}** was created.",
-            color=0xFF0000
+            color=0xFF0000,
         )
-        await ctx.author.send(f"Webhook URL for **{webhook.name}** in **{ctx.channel.name}**:\n||{webhook.url}||", embed=embed)
+        await ctx.author.send(
+            f"Webhook URL for **{webhook.name}** in **{ctx.channel.name}**:\n||{webhook.url}||",
+            embed=embed,
+        )
         await ctx.send("Webhook created. I've sent the URL to your DMs.")
     except discord.Forbidden:
         await ctx.send("I don't have permission to create webhooks here.")
@@ -209,7 +194,7 @@ async def create_hook(ctx: Context, *, name: str = None):
         await ctx.send(f"Webhook created: **{webhook.name}**\n||{webhook.url}||\n(I could not DM you the URL.)")
 
 
-@client.command(name='delete_hook', aliases=['delhook'])
+@client.command(name="delete_hook", aliases=["delhook"])
 @commands.has_permissions(administrator=True)
 async def delete_hook(ctx: Context, webhook_url: str = None):
     """Deletes a webhook using its URL."""
@@ -218,14 +203,14 @@ async def delete_hook(ctx: Context, webhook_url: str = None):
 
     try:
         async with aiohttp.ClientSession() as session:
-            webhook = await discord.Webhook.from_url(webhook_url, session=session)
+            webhook = discord.Webhook.from_url(webhook_url, session=session)
             await webhook.delete(reason=f"Deleted by {ctx.author}")
         await ctx.send("✅ Webhook deleted successfully.")
     except (discord.NotFound, ValueError):
         await ctx.send("❌ Webhook not found or URL is invalid.")
 
 
-@client.command(name='list_hooks', aliases=['hooks'])
+@client.command(name="list_hooks", aliases=["hooks"])
 @commands.has_permissions(administrator=True)
 async def list_hooks(ctx: Context):
     """Lists all webhooks in the current channel."""
@@ -235,49 +220,44 @@ async def list_hooks(ctx: Context):
             return await ctx.send("No webhooks found in this channel.")
 
         embed = discord.Embed(title=f"Webhooks in #{ctx.channel.name}", color=0xFF0000)
-        description = "\n".join([f"**Name:** {wh.name} | **ID:** `{wh.id}`" for wh in webhooks])
-        embed.description = description
+        embed.description = "\n".join(f"**Name:** {wh.name} | **ID:** `{wh.id}`" for wh in webhooks)
         await ctx.send(embed=embed)
     except discord.Forbidden:
         await ctx.send("I don't have permission to view webhooks in this channel.")
 
 
-# --- Game Command ---
 @client.command()
 async def reaction(ctx: Context):
     """See how fast you can react to the correct emoji."""
     emojis = ["🍪", "🎉", "🧋", "🍒", "🍑", "💸", "🌙", "💕"]
     correct_emoji = random.choice(emojis)
     random.shuffle(emojis)
-    
+
     embed = discord.Embed(
         title="Reaction Test",
         description="I will show an emoji in a few seconds. Get ready to click it!",
-        color=0xFF0000
+        color=0xFF0000,
     )
     message = await ctx.send(embed=embed)
-    
+
     for emoji in emojis:
         await message.add_reaction(emoji)
-        
+
     await asyncio.sleep(random.uniform(2.0, 7.0))
-    
     embed.description = f"**GET THE {correct_emoji} EMOJI!**"
     await message.edit(embed=embed)
     start_time = time.time()
 
-    def check(reaction, user):
+    def check(reaction_emoji, user):
         return (
-            reaction.message.id == message.id
-            and str(reaction.emoji) == correct_emoji
+            reaction_emoji.message.id == message.id
+            and str(reaction_emoji.emoji) == correct_emoji
             and user == ctx.author
         )
 
     try:
-        reaction, user = await client.wait_for("reaction_add", timeout=15.0, check=check)
-        end_time = time.time()
-        reaction_time = end_time - start_time
-        
+        _, user = await client.wait_for("reaction_add", timeout=15.0, check=check)
+        reaction_time = time.time() - start_time
         embed.description = f"{user.mention} got the {correct_emoji} in **{reaction_time:.2f} seconds**!"
         await message.edit(embed=embed)
     except asyncio.TimeoutError:
@@ -285,38 +265,31 @@ async def reaction(ctx: Context):
         await message.edit(embed=embed)
 
 
-# --- Keep Alive Server ---
-from flask import Flask
-from threading import Thread
-
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return f"GumballZ™ 2025"
-
-def run():
-    app.run(host='0.0.0.0', port=19346)
-
 def keep_alive():
-    server = Thread(target=run)
-    server.start()
+    from threading import Thread
+    from flask import Flask
 
-keep_alive()
+    app = Flask(__name__)
 
-# --- Main Bot Execution ---
+    @app.route("/")
+    def home():
+        return "GumballZ™ 2025"
+
+    Thread(target=lambda: app.run(host="0.0.0.0", port=19346), daemon=True).start()
+
+
 async def main():
     async with client:
-        os.system("clear")
+        os.system("cls" if platform.system() == "Windows" else "clear")
         await client.load_extension("jishaku")
-        
+
         max_retries = 5
         for attempt in range(max_retries):
             try:
                 await client.start(TOKEN)
                 break
             except discord.HTTPException as e:
-                if e.status == 429: # Rate limited
+                if e.status == 429:
                     wait_time = min((2 ** attempt) + random.random(), 60)
                     print(f"Rate limited. Retrying in {wait_time:.2f} seconds...")
                     await asyncio.sleep(wait_time)
@@ -325,5 +298,8 @@ async def main():
         else:
             raise Exception("Bot failed to start after multiple retries due to rate limiting.")
 
+
 if __name__ == "__main__":
+    if KEEP_ALIVE:
+        keep_alive()
     asyncio.run(main())

@@ -1,3 +1,4 @@
+import os
 import random
 import discord
 from discord.ext import commands, tasks
@@ -15,7 +16,6 @@ import asyncio
 from utils.Tools import *
 track_histories = {}
 import base64
-import asyncio
 import re
 
 SPOTIFY_TRACK_REGEX = r"https?://open\.spotify\.com/track/([a-zA-Z0-9]+)"
@@ -336,7 +336,9 @@ class Music(commands.Cog):
                     pass
 
     async def connect_nodes(self) -> None:
-        nodes = [wavelink.Node(uri="https://lava-v4.ajieblogs.eu.org", password="https://dsc.gg/ajidevserver")]
+        uri = os.getenv("LAVALINK_URI", "https://lavalink.jirayu.net")
+        password = os.getenv("LAVALINK_PASSWORD", "youshallnotpass")
+        nodes = [wavelink.Node(uri=uri, password=password)]
         await wavelink.Pool.connect(nodes=nodes, client=self.client, cache_capacity=None)
 
 

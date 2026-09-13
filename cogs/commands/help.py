@@ -80,82 +80,86 @@ class HelpCommand(commands.HelpCommand):
       await self.send_ignore_message(ctx, "command")
       return
 
-    # Show loading embed
     loading_embed = discord.Embed(
       description="<a:loadingred:1453413861121069147> Loading help Menu...",
       color=0xFF0000
     )
     loading_msg = await ctx.reply(embed=loading_embed)
 
-    # Wait 2 seconds
-    await asyncio.sleep(2)
+    try:
+      data = await getConfig(self.context.guild.id)
+      prefix = data["prefix"]
 
-    # Delete loading message
-    with suppress(discord.NotFound):
-      await loading_msg.delete()
+      embed = discord.Embed(
+          description=(
+           f"**<a:ArrowRed:1453413846755578079> __Start GumballZ Today__**\n"
+           f"**<:Arrow:1453391681142390876> Type `{prefix}antinuke enable`**\n"
+           f"**<:Arrow:1453391681142390876> Server Prefix:** `{prefix}`\n"
+           f"**<:Arrow:1453391681142390876> Total Commands:** `{len(set(self.context.bot.walk_commands()))}`\n"),
+          color=0xFF0000)
+      embed.set_author(name=f"{ctx.author}",
+                       icon_url=ctx.author.display_avatar.url)
+      embed.set_thumbnail(url=ctx.author.display_avatar.url)
 
-    data = await getConfig(self.context.guild.id)
-    prefix = data["prefix"]
-    filtered = await self.filter_commands(self.context.bot.walk_commands(), sort=True)
-
-    embed = discord.Embed(
-        description=(
-         f"**<a:ArrowRed:1453413846755578079> __Start GumballZ Today__**\n"        
-         f"**<:Arrow:1453391681142390876> Type {prefix}antinuke enable**\n"
-         f"**<:Arrow:1453391681142390876> Server Prefix:** `{prefix}`\n"
-         f"**<:Arrow:1453391681142390876> Total Commands:** `{len(set(self.context.bot.walk_commands()))}`\n"),         
-        color=0xFF0000)
-    embed.set_author(name=f"{ctx.author}", 
-                     icon_url=ctx.author.display_avatar.url)
-    embed.set_thumbnail(url=ctx.author.display_avatar.url)
-    
-    embed.add_field(
-        name="<:Cloud:1453391936080711680>  __**Main Features**__",
-        value=">>> \n <:Safe:1453391577962643476>  `»` Security\n" 
+      embed.add_field(
+          name="<:Cloud:1453391936080711680>  __**Main Features**__",
+          value=(
+              ">>> \n"
+              " <:Safe:1453391577962643476>  `»` Security\n"
               " <:bot:1453391686611898431>  `»` Automoderation\n"
               " <:codebase:1453391605565231105>  `»` Developer\n"
-              " <:wrench:1453391598426656818>  `»` Utility\n" 
+              " <:wrench:1453391598426656818>  `»` Utility\n"
               " <:music:1453391554990313562>  `»` Music\n"
               " <:wifi:1453391596002349097>  `»` Autoreact & responder\n"
               " <:sword:1453391584694374470>  `»` Moderation\n"
               " <:people:1453391564088021152>  `»` Autorole & Invc\n"
               " <:rocket:1453391575232282818>  `»` Fun\n"
-              " <:games:1453391627329470726>  `»` Games\n" 
+              " <:games:1453391627329470726>  `»` Games\n"
               " <:ban:1453391684661674076>  `»` Ignore Channels\n"
               " <:wifi:1453391596002349097> `»` Server\n"
               " <:unmute:1453391593917907147>  `»` Voice\n"
-              " <:seed:1453391580043153448>  `»` Welcomer\n"  
+              " <:seed:1453391580043153448>  `»` Welcomer\n"
               " <:tada:1453391586737131695>  `»` Giveaway\n"
               " <:ticket:1453391591698862191>  `»` Ticket <:New:1453394998807625820>\n"
               " <:people:1453391564088021152>  `»` Invite Tracker <:New:1453394998807625820>\n"
-    )
-    
-    embed.add_field(
-        name=" <:module:1453391552029135000>  __**Extra Features**__",
-        value=">>> \n <:cast:1453391688763576421>  `»` Advance Logging\n"
-              " <:starr:1453391665145446400>  `»` Vanityroles\n"
-              " <:unmute:1453391593917907147>  `»` TTS <:New:1453394998807625820>\n"
-              " <:counting:1453394890342793318>  `»` Counting <:New:1453394998807625820>\n"
-              " <:system:1453395385962987630>  `»` J2C <:New:1453394998807625820>\n"
-              " <:ai:1453395017681993730>  `»` AI <:New:1453394998807625820>\n"
-              " <:boost:1453391600817410190>  `»` Boost <:New:1453394998807625820>\n"
-              " <:levelup:1453394897309536307>  `»` Leveling <:New:1453394998807625820>\n"
-              " <:pin:1453394906612633661>  `»` Sticky <:New:1453394998807625820>\n"
-              " <:thunder:1453394963780862117>  `»` Verification <:New:1453394998807625820>\n"
-              " <:lock:1453394996043448441>  `»` Encryption <:New:1453394998807625820>\n" 
-              " <:mc:1453394900065456250>  `»` Minecraft <:New:1453394998807625820>\n"
-              " <:msg:1453394902611394571>  `»` Joindm <:New:1453394998807625820>\n"
-              " <:circle:1453395027211456575>  `»` Birthday <:New:1453394998807625820>\n"
-              " <:circle:1453391690848276614>  `»` Customrole\n"
-              " <:coin:1449205470861459546>  `»` Economy <:New:1453394998807625820>\n" 
-    )
+          ),
+      )
 
-    embed.set_footer(
-      text=f"Requested By {self.context.author} | [Support](https://dsc.gg/thenoicez)",
-    )
-    
-    view = vhelp.View(mapping=mapping, ctx=self.context, homeembed=embed, ui=2)
-    await ctx.reply(embed=embed, view=view)
+      embed.add_field(
+          name=" <:module:1453391552029135000>  __**Extra Features**__ <:New:1453394998807625820>",
+          value=(
+              ">>> \n"
+              " <:cast:1453391688763576421>  `»` Advance Logging\n"
+              " <:starr:1453391665145446400>  `»` Vanityroles\n"
+              " <:unmute:1453391593917907147>  `»` TTS\n"
+              " <:counting:1453394890342793318>  `»` Counting\n"
+              " <:system:1453395385962987630>  `»` J2C\n"
+              " <:ai:1453395017681993730>  `»` AI\n"
+              " <:boost:1453391600817410190>  `»` Boost\n"
+              " <:levelup:1453394897309536307>  `»` Leveling\n"
+              " <:pin:1453394906612633661>  `»` Sticky\n"
+              " <:thunder:1453394963780862117>  `»` Verification\n"
+              " <:lock:1453394996043448441>  `»` Encryption\n"
+              " <:mc:1453394900065456250>  `»` Minecraft\n"
+              " <:msg:1453394902611394571>  `»` Joindm\n"
+              " <:circle:1453395027211456575>  `»` Birthday\n"
+              " <:circle:1453391690848276614>  `»` Customrole\n"
+              " <:coin:1449205470861459546>  `»` Economy\n"
+          ),
+      )
+
+      embed.set_footer(text=f"Requested By {self.context.author} | Support: dsc.gg/thenoicez")
+
+      view = vhelp.View(mapping=mapping, ctx=self.context, homeembed=embed, ui=2)
+      await loading_msg.edit(embed=embed, view=view)
+    except Exception as e:
+      print(f"[help] send_bot_help failed: {e}")
+      err = discord.Embed(
+        description=f"❌ Failed to load help menu.\n```{type(e).__name__}: {e}```",
+        color=0xFF0000,
+      )
+      with suppress(Exception):
+        await loading_msg.edit(embed=err, view=None)
 
   async def send_command_help(self, command):
     ctx = self.context

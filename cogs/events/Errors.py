@@ -98,8 +98,17 @@ class Errors(Cog):
       return
 
     if isinstance(error, discord.HTTPException):
+      print(f"[command-error] HTTPException in {ctx.command}: {error}")
       return
 
     if isinstance(error, commands.CommandInvokeError):
+      print(f"[command-error] CommandInvokeError in {ctx.command}: {error.original}")
+      try:
+        await ctx.reply(
+          f"❌ Command error: `{type(error.original).__name__}: {error.original}`",
+          delete_after=15,
+        )
+      except Exception:
+        pass
       return
 
